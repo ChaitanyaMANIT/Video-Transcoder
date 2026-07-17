@@ -1,0 +1,20 @@
+# Dependency directories
+node_modules/
+container/node_modules/
+
+# Build outputs
+dist/
+
+# Environmental variables (contains sensitive keys!)
+.env
+
+# Local temporary video files
+original-video.mp4
+video-360p.mp4
+video-480p.mp4
+video-720p.mp4
+video-*.mp4
+
+# OS generated files
+.DS_Store
+Thumbs.db
