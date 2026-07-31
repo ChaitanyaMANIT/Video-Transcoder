@@ -8,7 +8,7 @@ const QUEUE_URL = process.env.SQS_QUEUE_URL || 'https://sqs.ap-south-1.amazonaws
 const ECS_CLUSTER = process.env.ECS_CLUSTER_ARN || 'arn:aws:ecs:ap-south-1:911229171877:cluster/test-cluster';
 const ECS_TASK_DEFINITION = process.env.ECS_TASK_DEFINITION_ARN || 'arn:aws:ecs:ap-south-1:911229171877:task-definition/task-video-transcoder';
 
-const client = new SQSClient({ region: REGION });
+const sqsClient = new SQSClient({ region: REGION });
 const ecsClient = new ECSClient({ region: REGION });
 
 async function init() {
@@ -19,7 +19,7 @@ async function init() {
     })
 
     while (true) {
-        const { Messages } = await client.send(command);
+        const { Messages } = await sqsClient.send(command);
 
         if (!Messages) {
             console.log('No message found');
@@ -39,7 +39,7 @@ async function init() {
                 if ('Service' in event && 'Event' in event) { // Ignores the test event from s3
                     if (event.Event === 's3:TestEvent') {
                         // Invalid Event => Delete it
-                        await client.send(new DeleteMessageCommand({
+                        await sqsClient.send(new DeleteMessageCommand({
                             QueueUrl: QUEUE_URL,
                             ReceiptHandle: Message.ReceiptHandle,
                         }));
@@ -51,7 +51,17 @@ async function init() {
 
                 for (const record of event.Records) {
                     const { s3 } = record;
-                    const { bucket, object: { key } } = s3;
+                    const { bucket, object } = s3;
+                    const key: string = object.key || "";
+
+                    // Extract the videoId from the S3 key (e.g., "uploads/123-abc/original.mp4" -> "123-abc")
+                    let videoId = "unknown";
+                    if (key.startsWith("uploads/")) {
+                        const parts = key.split('/');
+                        if (parts.length >= 2 && parts[1]) {
+                            videoId = parts[1];
+                        }
+                    }
 
                     const runTaskCommand = new RunTaskCommand({
                         taskDefinition: ECS_TASK_DEFINITION,
@@ -71,12 +81,20 @@ async function init() {
                                     environment: [
                                         {
                                             name: 'BUCKET_NAME',
-                                            value: bucket.name
+                                            value: bucket.name,
                                         },
                                         {
                                             name: 'KEY',
                                             value: key,
                                         },
+                                        {
+                                            name: 'VIDEO_ID',
+                                            value: videoId
+                                        },
+                                        {
+                                            name: 'API_BASE_URL',
+                                            value: 'http://YOUR_BACKEND_PUBLIC_IP:3000'
+                                        }
                                     ],
                                 },
                             ],
@@ -84,7 +102,7 @@ async function init() {
                     });
 
                     await ecsClient.send(runTaskCommand);
-                    await client.send(new DeleteMessageCommand({
+                    await sqsClient.send(new DeleteMessageCommand({
                         QueueUrl: QUEUE_URL,
                         ReceiptHandle: Message.ReceiptHandle,
                     }));

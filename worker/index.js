@@ -13,7 +13,7 @@ const RESOLUTIONS = [
 ];
 
 const s3Client = new S3Client({
-    region: process.env.AWS_REGION || 'ap-south-1'
+    region: process.env.AWS_REGION || 'ap-south-1',
 })
 
 
@@ -25,7 +25,7 @@ async function init() {
         }
 
         console.log(`Downloading s3://${BUCKET}/${KEY} locally...`);
-        
+
         // Download the original video locally
         const command = new GetObjectCommand({
             Bucket: BUCKET,
@@ -50,7 +50,7 @@ async function init() {
                         try {
                             const destBucket = process.env.DESTINATION_BUCKET || "transcoded-videos-cha.kulkarni";
                             console.log(`Uploading transcoded file ${output} to S3 bucket ${destBucket}...`);
-                            
+
                             const putCommand = new PutObjectCommand({
                                 Bucket: destBucket,
                                 Key: output,
@@ -59,7 +59,7 @@ async function init() {
 
                             await s3Client.send(putCommand);
                             console.log('Uploaded: ', output);
-                            
+
                             // Delete local transcoded file
                             await fs.unlink(output);
                             resolve(output);
@@ -84,7 +84,7 @@ async function init() {
         process.exitCode = 1;
     } finally {
         // Clean up the original local video if it exists
-        await fs.unlink(originalFilePath).catch(() => {});
+        await fs.unlink(originalFilePath).catch(() => { });
     }
 }
 

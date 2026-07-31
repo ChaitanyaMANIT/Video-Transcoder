@@ -1,0 +1,38 @@
+{
+    "Records": [
+        {
+            "eventVersion": "2.4",
+            "eventSource": "aws:s3",
+            "awsRegion": "ap-south-1",
+            "eventTime": "2026-07-16T11:35:30.990Z",
+            "eventName": "ObjectCreated:Put",
+            "userIdentity": {
+                "principalId": "A1ZSCV527YM35V"
+            },
+            "requestParameters": {
+                "sourceIPAddress": "157.32.207.246"
+            },
+            "responseElements": {
+                "x-amz-request-id": "KNBAFPXE7V243XJE",
+                "x-amz-id-2": "EAioLXtNgsvGPiHide7m9bSKYdDGyp9VZLU1K61mzvcXZGaI2y4Yk4UXr8EWa3IlFre6Od0hrfpSBSjnVPkDHk4z5+IGfJ2ZH2vLgjvgbkg="
+            },
+            "s3": {
+                "s3SchemaVersion": "1.0",
+                "configurationId": "temp-bucket-create-event-to-SQS",
+                "bucket": {
+                    "name": "temp-videos-cha.kulkarni",
+                    "ownerIdentity": {
+                        "principalId": "A1ZSCV527YM35V"
+                    },
+                    "arn": "arn:aws:s3:::temp-videos-cha.kulkarni"
+                },
+                "object": {
+                    "key": "sample-mp4-videos/sample-5s-360p.mp4",
+                    "size": 1137884,
+                    "eTag": "4c811bc15b7079732031b987eb154083",
+                    "sequencer": "006A58C202EF3907C9"
+                }
+            }
+        }
+    ]
+}

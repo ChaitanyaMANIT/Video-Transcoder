@@ -178,21 +178,56 @@ model Video {
 
 ---
 
-## 🎯 Why Event-Driven Architecture?
+## 🎯 System Design & Architectural Trade-offs
 
-### Benefits
-- **Scalability**: SQS buffers unlimited uploads; ECS scales transcoding workers automatically
-- **Decoupling**: Frontend, backend, and transcoding service are independent
-- **Reliability**: Failed jobs stay in SQS for retry; no data loss
-- **Cost-Effective**: Pay only for actual transcoding time (ECS Fargate)
-- **No Server Management**: Fully managed AWS services
+This project was built with professional, production-grade microservices patterns. Below is an explanation of the core architectural decisions and trade-offs made:
 
-### Design Patterns Used
-- **Event Sourcing**: S3 events trigger downstream processing
-- **Message Queue Pattern**: SQS decouples producers (S3) from consumers (ECS)
-- **Fan-Out Pattern**: Single upload triggers multiple parallel transcoding jobs
-- **Webhook Pattern**: Worker notifies backend of completion
-- **Polling with Exponential Backoff**: Frontend polls for status updates
+### 1. Why SQS Queue instead of Direct ECS Task Launch?
+* **Rate Limiting & Throttling Protection**: Launching an ECS task directly on every S3 upload could run into AWS API rate limits (e.g., `ecs:RunTask` limit of 20 operations per second by default in some regions). If 100 users uploaded files simultaneously, requests would be throttled and tasks dropped.
+* **Buffer & Shock-Absorption**: Under spikes in traffic, SQS acts as a buffer. The messages safely sit in the queue until the manager polls and spins up workers within the allowed resource constraints.
+* **Reliability & Retry Mechanism**: If a worker fails mid-process (e.g., networking hiccup), SQS visibility timeout will expire, and the message will automatically reappear in the queue for processing. If we used direct invocation, a failure would lose the processing request entirely.
+
+### 2. Why Presigned URLs instead of Uploading to Backend Server First?
+* **Eliminating Server Bottlenecks**: High-definition video files are huge. If the frontend sent files to our Express backend, the backend server would spend all its CPU, RAM, and network bandwidth simply receiving files. It would slow down or crash, affecting other users.
+* **Cost Efficiency**: Uploading directly to S3 shifts 100% of the network load and memory consumption to AWS's massive infrastructure. Our backend Express server can run on a tiny, cheap instance (like a t3.nano) and remain highly responsive.
+* **Security & Scope**: By using temporary presigned URLs, we avoid hardcoding AWS secret keys in the client browser, while restricting write access to just one specific file path for 5 minutes.
+
+### 3. Why ECS Fargate instead of AWS Lambda for the Worker?
+* **No Timeout Constraints**: AWS Lambda has a hard execution limit of **15 minutes**. Transcoding a long, high-bitrate video can easily take 30+ minutes, causing a Lambda to timeout. Fargate has no runtime limits.
+* **Disk Space & Resource Limits**: Video processing requires downloading the original video and storing output files. Lambda ephemeral storage is limited (up to 10GB now, but expensive to scale), whereas ECS Fargate tasks can easily allocate up to 200GB of ephemeral storage.
+* **CPU/Memory Flexibility**: Codecs like `libx264` are highly CPU-bound. ECS Fargate allows us to allocate precise virtual CPUs (vCPUs) and RAM tailored for heavy encoding pipelines, which is far more cost-effective for sustained execution.
+
+---
+
+## 💸 Cost Estimation at Scale (1,000 Videos/Day)
+
+To demonstrate production awareness, here is a cost breakdown for running this pipeline at a moderate scale of **1,000 video uploads per day** (assuming average length 3 minutes, 100MB input file size, and 2 minutes of Fargate transcoding compute per video using `0.5 vCPU` and `1 GB RAM`).
+
+### 1. AWS SQS (Message Queue)
+* **Scale**: 1,000 uploads = ~1,000 SQS queue operations/day = 30,000 operations/month.
+* **Cost**: **$0.00 / month** (First 1 million SQS requests/month are free under the AWS Free Tier).
+
+### 2. AWS S3 (Storage & Transfer)
+* **Upload Storage**: 1,000 videos * 100MB = 100 GB/day = 3 TB/month.
+* **Output Storage**: 3 transcoded versions (360p, 480p, 720p) = ~80MB combined * 1000/day = 2.4 TB/month.
+* **Cost**:
+  * Storage (S3 Standard): 5.4 TB * $0.023/GB = **$124.20 / month**.
+  * API Requests (PUT, GET): 30,000 PUTs + 30,000 GETs = **$0.20 / month**.
+
+### 3. AWS ECS Fargate (Transcoding Compute)
+* **Compute Specs**: 0.5 vCPU + 1.0 GB RAM per task.
+* **Runtime**: 2 minutes per video * 1,000 videos/day = 2,000 minutes/day = 1,000 hours/month.
+* **Cost** (ap-south-1 Pricing):
+  * vCPU Cost: 1,000 hrs * 0.5 vCPU * $0.04048/vCPU-hr = $20.24/month.
+  * RAM Cost: 1,000 hrs * 1 GB * $0.004445/GB-hr = $4.45/month.
+  * Total Fargate Cost: **$24.69 / month**.
+
+### 4. Data Transfer (Egress)
+* S3 to Internet (Users downloading videos): Assuming 50% of transcoded videos are downloaded (1.2 TB/month egress).
+* **Cost**: 1,200 GB * $0.09/GB = **$108.00 / month**.
+
+### 📊 Monthly Running Total: ~$257.09
+* *Note: Over 90% of the cost is storage and network data transfer (Egress). The actual event-driven serverless computing (SQS + Fargate) only costs **~$25/month**, showing the extreme efficiency of serverless compute.*
 
 ---
 

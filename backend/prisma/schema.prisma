@@ -1,0 +1,39 @@
+// This is your Prisma schema file! 
+// It defines the shape of your database tables.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // We are using "sqlite" because it creates a simple local database file (dev.db).
+  // You don't have to install any heavy database software!
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// This "model" creates a table called "Video" to store our video details.
+model Video {
+  // A unique string (UUID) automatically generated for every new video
+  id            String   @id @default(uuid()) 
+  
+  // The user-friendly title of the video
+  title         String   
+  
+  // The path/name of the video file exactly as it is saved in AWS S3
+  originalKey   String   
+  
+  // The current state of the video. It starts as "Pending" by default.
+  // Other statuses will be: "Transcoding", "Completed", or "Failed".
+  status            String   @default("Pending") 
+
+  // Store the key of the generated thumbnail in S3
+  thumbnailKey      String?
+
+  // Store transcoding progress (0-100)
+  transcodeProgress Int      @default(0)
+  
+  // Timestamps to know when the video was uploaded and last updated
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
