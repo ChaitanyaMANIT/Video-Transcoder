@@ -5,8 +5,6 @@ import ffmpeg from 'fluent-ffmpeg'
 
 const BUCKET = process.env.BUCKET_NAME;
 const KEY = process.env.KEY;
-const VIDEO_ID = process.env.VIDEO_ID;
-const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000';
 
 const RESOLUTIONS = [
     { name: "360p", width: 480, height: 360 },
@@ -15,7 +13,7 @@ const RESOLUTIONS = [
 ];
 
 const s3Client = new S3Client({
-    region: process.env.AWS_REGION || 'ap-south-1'
+    region: process.env.AWS_REGION || 'ap-south-1',
 })
 
 
@@ -81,37 +79,8 @@ async function init() {
 
         await Promise.all(promises);
         console.log('All resolutions transcoded and uploaded successfully.');
-
-        // Let the backend know the job is finished!
-        if (VIDEO_ID) {
-            try {
-                await fetch(`${API_BASE_URL}/update-status`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ videoId: VIDEO_ID, status: 'Completed' })
-                });
-                console.log('Backend notified of success!');
-            } catch (err) {
-                console.error('Failed to notify backend:', err);
-            }
-        }
     } catch (error) {
         console.error('Transcoding job failed:', error);
-
-        // Let the backend know the job failed!
-        if (VIDEO_ID) {
-            try {
-                await fetch(`${API_BASE_URL}/update-status`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ videoId: VIDEO_ID, status: 'Failed' })
-                });
-                console.log('Backend notified of failure!');
-            } catch (err) {
-                console.error('Failed to notify backend:', err);
-            }
-        }
-
         process.exitCode = 1;
     } finally {
         // Clean up the original local video if it exists

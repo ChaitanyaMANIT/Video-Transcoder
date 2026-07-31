@@ -25,9 +25,15 @@ model Video {
   
   // The current state of the video. It starts as "Pending" by default.
   // Other statuses will be: "Transcoding", "Completed", or "Failed".
-  status        String   @default("Pending") 
+  status            String   @default("Pending") 
+
+  // Store the key of the generated thumbnail in S3
+  thumbnailKey      String?
+
+  // Store transcoding progress (0-100)
+  transcodeProgress Int      @default(0)
   
   // Timestamps to know when the video was uploaded and last updated
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }

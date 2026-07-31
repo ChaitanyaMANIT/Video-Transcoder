@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { v4 as uuidv4 } from 'uuid';
 import dotenv from 'dotenv';
@@ -81,6 +81,7 @@ app.post('/videos', async (req, res) => {
         status: "Pending" // Starts as Pending
       }
     });
+    
 
     res.json(newVideo);
   } catch (error) {
@@ -100,7 +101,48 @@ app.get('/videos', async (req, res) => {
     const videos = await prisma.video.findMany({
       orderBy: { createdAt: 'desc' }
     });
-    res.json(videos);
+
+    const destinationBucket = process.env.DESTINATION_BUCKET || 'transcoded-videos-cha.kulkarni';
+
+    // Generate presigned URLs for thumbnail and downloads
+    const videosWithUrls = await Promise.all(videos.map(async (video) => {
+      const result = { ...video };
+
+      // Generate thumbnail URL if thumbnailKey exists
+      if (video.thumbnailKey) {
+        try {
+          const thumbCommand = new GetObjectCommand({
+            Bucket: destinationBucket,
+            Key: video.thumbnailKey
+          });
+          result.thumbnailUrl = await getSignedUrl(s3Client, thumbCommand, { expiresIn: 3600 }); // 1 hour
+        } catch (e) {
+          console.error("Error generating thumbnail presigned URL:", e);
+        }
+      }
+
+      // Generate download URLs if status is Completed
+      if (video.status === 'Completed') {
+        const resolutions = ['360p', '480p', '720p'];
+        result.downloadUrls = {};
+        for (const resName of resolutions) {
+          try {
+            const key = `transcoded/${video.id}/${resName}.mp4`;
+            const downloadCommand = new GetObjectCommand({
+              Bucket: destinationBucket,
+              Key: key
+            });
+            result.downloadUrls[resName] = await getSignedUrl(s3Client, downloadCommand, { expiresIn: 3600 });
+          } catch (e) {
+            console.error(`Error generating download URL for ${resName}:`, e);
+          }
+        }
+      }
+
+      return result;
+    }));
+
+    res.json(videosWithUrls);
   } catch (error) {
     console.error("Error fetching videos:", error);
     res.status(500).json({ error: "Failed to fetch videos" });
@@ -114,12 +156,20 @@ app.get('/videos', async (req, res) => {
 // Our AWS ECS Worker calls this when it finishes transcoding
 app.post('/update-status', async (req, res) => {
   try {
-    const { videoId, status } = req.body;
+    const { videoId, status, progress, thumbnailKey } = req.body;
+
+    const dataToUpdate = { status };
+    if (progress !== undefined) {
+      dataToUpdate.transcodeProgress = progress;
+    }
+    if (thumbnailKey !== undefined) {
+      dataToUpdate.thumbnailKey = thumbnailKey;
+    }
 
     // Update the video's status in the database (e.g. to "Completed")
     const updatedVideo = await prisma.video.update({
       where: { id: videoId },
-      data: { status: status }
+      data: dataToUpdate
     });
 
     res.json(updatedVideo);

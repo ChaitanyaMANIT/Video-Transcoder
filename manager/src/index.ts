@@ -81,7 +81,7 @@ async function init() {
                                     environment: [
                                         {
                                             name: 'BUCKET_NAME',
-                                            value: bucket.name
+                                            value: bucket.name,
                                         },
                                         {
                                             name: 'KEY',
@@ -90,6 +90,10 @@ async function init() {
                                         {
                                             name: 'VIDEO_ID',
                                             value: videoId
+                                        },
+                                        {
+                                            name: 'API_BASE_URL',
+                                            value: 'http://YOUR_BACKEND_PUBLIC_IP:3000'
                                         }
                                     ],
                                 },

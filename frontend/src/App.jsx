@@ -110,12 +110,76 @@ function App() {
         <div className="grid">
           {videos.map(video => (
             <div key={video.id} className="card video-card">
+              {/* Thumbnail Container */}
+              <div className="video-thumbnail-container">
+                {video.thumbnailUrl ? (
+                  <img src={video.thumbnailUrl} className="video-thumbnail" alt={video.title} />
+                ) : (
+                  <div className="thumbnail-placeholder">
+                    {video.status === 'Pending' && (
+                      <>
+                        <div className="spinner"></div>
+                        <span>Waiting...</span>
+                      </>
+                    )}
+                    {video.status === 'Transcoding' && (
+                      <>
+                        <div className="spinner"></div>
+                        <span>Generating preview...</span>
+                      </>
+                    )}
+                    {video.status === 'Failed' && (
+                      <span>❌ Error generating preview</span>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <h3>{video.title}</h3>
-              {/* Show different colors based on the status! */}
+              
+              {/* Status Badge */}
               <div className={`status-badge status-${video.status.toLowerCase()}`}>
                 {video.status}
               </div>
+
+              {/* Transcoding Progress Bar */}
+              {video.status === 'Transcoding' && (
+                <div className="transcode-progress-section">
+                  <div className="transcode-progress-label">
+                    <span className="pulse">Processing video...</span>
+                    <span>{video.transcodeProgress}%</span>
+                  </div>
+                  <div className="progress-bar-container">
+                    <div className="progress-bar" style={{ width: `${video.transcodeProgress}%` }}></div>
+                  </div>
+                </div>
+              )}
+
               <p className="date">Uploaded: {new Date(video.createdAt).toLocaleString()}</p>
+
+              {/* Download Buttons */}
+              {video.status === 'Completed' && video.downloadUrls && (
+                <div className="download-section">
+                  <h4>Download Resolutions</h4>
+                  <div className="download-buttons">
+                    {video.downloadUrls['360p'] && (
+                      <a href={video.downloadUrls['360p']} target="_blank" rel="noopener noreferrer" className="download-btn">
+                        360p
+                      </a>
+                    )}
+                    {video.downloadUrls['480p'] && (
+                      <a href={video.downloadUrls['480p']} target="_blank" rel="noopener noreferrer" className="download-btn">
+                        480p
+                      </a>
+                    )}
+                    {video.downloadUrls['720p'] && (
+                      <a href={video.downloadUrls['720p']} target="_blank" rel="noopener noreferrer" className="download-btn">
+                        720p
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
